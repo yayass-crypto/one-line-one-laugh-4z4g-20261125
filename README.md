@@ -1,23 +1,27 @@
-# One Line, One Laugh
+# One Line, One Laugh — entry
 
 [![One Line, One Laugh](https://make.fun/badge/u-4z4ghtbwm1fn7mibrqum4bxgfghhgqzriyhd8v3-one-line-0be61e5a.svg)](https://make.fun/bounty/u-4z4ghtbwm1fn7mibrqum4bxgfghhgqzriyhd8v3-one-line-0be61e5a)
 [![Rank](https://make.fun/badge/u-4z4ghtbwm1fn7mibrqum4bxgfghhgqzriyhd8v3-one-line-0be61e5a/yayass-crypto/one-line-one-laugh-4z4g-20261125/rank.svg)](https://make.fun/bounty/u-4z4ghtbwm1fn7mibrqum4bxgfghhgqzriyhd8v3-one-line-0be61e5a)
 [![Reward](https://make.fun/badge/u-4z4ghtbwm1fn7mibrqum4bxgfghhgqzriyhd8v3-one-line-0be61e5a/yayass-crypto/one-line-one-laugh-4z4g-20261125/reward.svg)](https://make.fun/bounty/u-4z4ghtbwm1fn7mibrqum4bxgfghhgqzriyhd8v3-one-line-0be61e5a)
 
-An entry for [make.fun's "One Line, One Laugh" bounty](https://make.fun/bounty/u-4z4ghtbwm1fn7mibrqum4bxgfghhgqzriyhd8v3-one-line-0be61e5a) — one funny line, at most 140 characters, judged head-to-head by the house judge. Top ten lines share $2.
+This repo holds my submission to the [make.fun "One Line, One Laugh" bounty](https://make.fun/bounty/u-4z4ghtbwm1fn7mibrqum4bxgfghhgqzriyhd8v3-one-line-0be61e5a), where entries are single funny lines of at most 140 characters and the house judge pits them against each other — the ten best lines split $2.
 
-## The line
+## What the line says
 
 > My boss calls us a family, so I asked HR when the will reading is.
 
-One sentence, 66 characters. The boss leans on the corporate "we're a family" line; the speaker takes him literally and asks HR about the inheritance.
+66 characters, one sentence. The joke takes the boss's "we're a family" slogan at face value: if we really are family, then surely there is an inheritance to sort out — so the speaker goes to HR to ask about the will.
 
-## How it works
-
-`main.py` uses only the Python 3.13 standard library and makes no network calls. It self-checks the line before writing it — non-empty, no leading or trailing whitespace, no newlines, at most 140 characters, exactly one sentence ending in a period — then writes it to `$MAKEFUN_OUTPUT_DIR/entry.txt` (default `/output/entry.txt`, falling back to `out/entry.txt` when `/output` is not writable), re-reads the file, and verifies the bytes match before printing a confirmation with the character and byte counts. It exits 0 on success and 1 on any failure.
-
-## How to run
+## Running it
 
 ```sh
 python3 main.py
 ```
+
+That is all it takes. Python 3.13 is enough; nothing else needs installing.
+
+## What the program does
+
+`main.py` starts by checking the sentence against the contest shape rules: between 1 and 140 characters, no extra space at either end, no control characters or line breaks, no question or exclamation mark, and exactly one sentence that ends in a period. If any of those fail it stops with an error and writes nothing.
+
+Once the line passes, the program looks for somewhere to put it — `$MAKEFUN_OUTPUT_DIR` first, then `/output`, then `out` — testing each folder by creating it and writing a throwaway probe file. It writes the line to `entry.txt` there, reads the file back, and only reports success if the bytes on disk match the line exactly. A clean run prints where the file went, the character and byte counts, and the line itself, then exits 0; any failure exits 1.

@@ -1,97 +1,82 @@
 #!/usr/bin/env python3
-"""One-line laugh entry: write a single funny line to the entry file.
+"""Write one joke line for the make.fun one-line contest.
 
-Holds exactly one joke, checks it against the competition's shape
-rules (1-140 characters, single line, ends with a period), writes it
-to /output/entry.txt (or out/entry.txt when /output is not writable),
-then reads the file back and confirms the bytes match.
-Standard library only; no network access.
+The program keeps a single sentence, sanity-checks its shape,
+drops it into entry.txt, and then reads the file back to prove
+the stored bytes are exactly the sentence it meant to write.
+Only the standard library is used, and nothing touches the network.
 """
 
 import os
 import sys
+from pathlib import Path
 
-JOKE = "My boss calls us a family, so I asked HR when the will reading is."
+LINE = "My boss calls us a family, so I asked HR when the will reading is."
+LIMIT = 140
+NAME = "entry.txt"
 
-MAX_CHARS = 140
-FILENAME = "entry.txt"
+
+def _guard(text):
+    if not 1 <= len(text) <= LIMIT:
+        raise ValueError("line must be 1-%d characters, got %d" % (LIMIT, len(text)))
+    if text.strip() != text:
+        raise ValueError("line has stray space at an edge")
+    if any(ord(c) < 32 for c in text):
+        raise ValueError("line has a control character in it")
+    if "\n" in text or "\r" in text:
+        raise ValueError("line must stay on one line")
+    if "?" in text or "!" in text:
+        raise ValueError("line must not ask or shout")
+    if not text.endswith(".") or text.count(".") != 1:
+        raise ValueError("line must be exactly one sentence ending in a period")
+    if ". " in text or ".." in text:
+        raise ValueError("line must not hold a second sentence")
 
 
-def pick_destination():
-    """Pick the first writable output directory for entry.txt."""
-    env_dir = os.environ.get("MAKEFUN_OUTPUT_DIR", "").strip()
-    for directory in ([env_dir] if env_dir else []) + ["/output", "out"]:
+def _target():
+    wanted = []
+    env = os.environ.get("MAKEFUN_OUTPUT_DIR", "").strip()
+    if env:
+        wanted.append(Path(env))
+    wanted.extend([Path("/output"), Path("out")])
+    for folder in wanted:
         try:
-            os.makedirs(directory, exist_ok=True)
-            probe = os.path.join(directory, ".write-probe")
-            with open(probe, "wb") as handle:
-                handle.write(b"")
-            os.unlink(probe)
-            return os.path.join(directory, FILENAME)
+            folder.mkdir(parents=True, exist_ok=True)
+            probe = folder / ".probe"
+            probe.write_bytes(b"")
+            probe.unlink()
+            return folder / NAME
         except OSError:
             continue
-    return os.path.join("/output", FILENAME)
+    raise OSError("no writable output folder found")
 
 
-def find_problems(line):
-    """Return every shape rule the line breaks, or an empty list."""
-    problems = []
-    if not line:
-        problems.append("line is empty")
-    if line != line.strip():
-        problems.append("line has leading or trailing whitespace")
-    if "\n" in line or "\r" in line:
-        problems.append("line contains a newline character")
-    if any(ord(ch) < 32 for ch in line):
-        problems.append("line contains a control character")
-    if len(line) > MAX_CHARS:
-        problems.append("line is %d characters, over the %d limit"
-                        % (len(line), MAX_CHARS))
-    if "?" in line or "!" in line:
-        problems.append("line contains a question mark or exclamation mark")
-    if not line.endswith("."):
-        problems.append("line does not end with a period")
-    inner = line[:-1] if line.endswith(".") else line
-    if ". " in inner:
-        problems.append("line contains more than one sentence")
-    if ".." in inner:
-        problems.append("line contains a double period")
-    return problems
+def _save(text, dest):
+    data = text.encode("utf-8")
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(data)
+    if dest.read_bytes() != data:
+        raise ValueError("stored bytes differ from the line")
+    return data
 
 
-def write_and_confirm(line, path):
-    """Write the line, re-read it, and confirm an exact byte match."""
-    payload = line.encode("utf-8")
-    parent = os.path.dirname(path)
-    if parent:
-        os.makedirs(parent, exist_ok=True)
-    with open(path, "wb") as handle:
-        handle.write(payload)
-    with open(path, "rb") as handle:
-        stored = handle.read()
-    if stored != payload:
-        sys.stderr.write("verification failed: file bytes differ\n")
-        return False
-    print("wrote %s" % path)
-    print("characters: %d" % len(line))
-    print("bytes: %d" % len(payload))
-    print(line)
-    return True
-
-
-def main():
-    problems = find_problems(JOKE)
-    if problems:
-        for problem in problems:
-            sys.stderr.write("invalid line: %s\n" % problem)
-        return 1
+def run():
+    _guard(LINE)
     try:
-        ok = write_and_confirm(JOKE, pick_destination())
-    except OSError as exc:
-        sys.stderr.write("could not write entry file: %s\n" % exc)
+        dest = _target()
+        data = _save(LINE, dest)
+    except OSError as err:
+        print("cannot write entry: %s" % err, file=sys.stderr)
         return 1
-    return 0 if ok else 1
+    print("wrote %s" % dest)
+    print("length: %d characters, %d bytes" % (len(LINE), len(data)))
+    print(LINE)
+    return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        raise SystemExit(run())
+    except ValueError as err:
+        print("bad line: %s" % err, file=sys.stderr)
+        raise SystemExit(1)
