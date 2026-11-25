@@ -1,63 +1,39 @@
 #!/usr/bin/env python3
-"""One-line laugh entry: a single sentence written to the output file.
+"""One-line laugh entry: write a single funny line to the entry file.
 
-The program holds exactly one joke line, checks it against the
-competition's shape rules, writes it to the entry file, then reads the
-file back and confirms the bytes match before reporting success.
-Only the Python standard library is used; nothing touches the network.
+Holds exactly one joke, checks it against the competition's shape
+rules (1-140 characters, single line, ends with a period), writes it
+to /output/entry.txt (or out/entry.txt when /output is not writable),
+then reads the file back and confirms the bytes match.
+Standard library only; no network access.
 """
 
 import os
 import sys
 
-# The joke. One sentence, 66 characters, punchline on the last words.
-# Revised after grading v1: "said we're a family" -> "calls us a family"
-# cuts two characters and uses the habitual phrasing bosses actually repeat,
-# so the setup lands faster and the twist ("the will reading is") stays last.
-JOKE = (
-    "My boss calls us a family, so I asked HR when the will reading is."
-)
+JOKE = "My boss calls us a family, so I asked HR when the will reading is."
 
 MAX_CHARS = 140
-DEFAULT_DIR = "/output"
-FALLBACK_DIR = "out"
 FILENAME = "entry.txt"
 
 
-def pick_destination() -> str:
-    """Choose where entry.txt goes.
-
-    The MAKEFUN_OUTPUT_DIR environment variable wins when set. Otherwise
-    /output is tried first; when it cannot be created or written to, the
-    program falls back to a local out/ directory next to the script.
-    """
-    requested = os.environ.get("MAKEFUN_OUTPUT_DIR", "").strip()
-    candidates = []
-    if requested:
-        candidates.append(requested)
-    candidates.append(DEFAULT_DIR)
-    candidates.append(FALLBACK_DIR)
-
-    for directory in candidates:
+def pick_destination():
+    """Pick the first writable output directory for entry.txt."""
+    env_dir = os.environ.get("MAKEFUN_OUTPUT_DIR", "").strip()
+    for directory in ([env_dir] if env_dir else []) + ["/output", "out"]:
         try:
             os.makedirs(directory, exist_ok=True)
-        except OSError:
-            continue
-        probe = os.path.join(directory, ".write-probe")
-        try:
+            probe = os.path.join(directory, ".write-probe")
             with open(probe, "wb") as handle:
                 handle.write(b"")
             os.unlink(probe)
+            return os.path.join(directory, FILENAME)
         except OSError:
             continue
-        return os.path.join(directory, FILENAME)
-
-    # Nothing writable anywhere we tried; surface the default path so the
-    # failure message names a concrete location.
-    return os.path.join(DEFAULT_DIR, FILENAME)
+    return os.path.join("/output", FILENAME)
 
 
-def find_problems(line: str) -> list:
+def find_problems(line):
     """Return every shape rule the line breaks, or an empty list."""
     problems = []
     if not line:
@@ -69,9 +45,8 @@ def find_problems(line: str) -> list:
     if any(ord(ch) < 32 for ch in line):
         problems.append("line contains a control character")
     if len(line) > MAX_CHARS:
-        problems.append(
-            "line is %d characters, over the %d limit" % (len(line), MAX_CHARS)
-        )
+        problems.append("line is %d characters, over the %d limit"
+                        % (len(line), MAX_CHARS))
     if "?" in line or "!" in line:
         problems.append("line contains a question mark or exclamation mark")
     if not line.endswith("."):
@@ -84,7 +59,7 @@ def find_problems(line: str) -> list:
     return problems
 
 
-def write_and_confirm(line: str, path: str) -> bool:
+def write_and_confirm(line, path):
     """Write the line, re-read it, and confirm an exact byte match."""
     payload = line.encode("utf-8")
     parent = os.path.dirname(path)
@@ -95,9 +70,7 @@ def write_and_confirm(line: str, path: str) -> bool:
     with open(path, "rb") as handle:
         stored = handle.read()
     if stored != payload:
-        sys.stderr.write(
-            "verification failed: file bytes differ from the line\n"
-        )
+        sys.stderr.write("verification failed: file bytes differ\n")
         return False
     print("wrote %s" % path)
     print("characters: %d" % len(line))
@@ -106,15 +79,14 @@ def write_and_confirm(line: str, path: str) -> bool:
     return True
 
 
-def main() -> int:
+def main():
     problems = find_problems(JOKE)
     if problems:
         for problem in problems:
             sys.stderr.write("invalid line: %s\n" % problem)
         return 1
-    destination = pick_destination()
     try:
-        ok = write_and_confirm(JOKE, destination)
+        ok = write_and_confirm(JOKE, pick_destination())
     except OSError as exc:
         sys.stderr.write("could not write entry file: %s\n" % exc)
         return 1
